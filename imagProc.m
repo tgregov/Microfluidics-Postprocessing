@@ -3,14 +3,16 @@ clear variables;
 close all;
 warning('off');
 
-% Comments:
-% - only works if the input file is a video (> 1 frame)
-
 % Import video
 fileName = 'chip4_500fps_rec10.avi';
 v = VideoReader(fileName);
 video = read(v);
 sizeV = size(video);
+if(length(sizeV) ~= 4)
+    fprintf(2, ['<strong>WARNING: THE VIDEO SHOULD HAVE MORE THAN 1', ...
+        ' FRAME FOR THIS SCRIPT TO WORK</strong>\n']);
+    return;
+end
 videoGS = reshape(video, sizeV(1), sizeV(2), sizeV(4));
 videoGS = im2double(videoGS);
 fprintf(['<strong>Post-processing of the file ', fileName, '</strong>\n']);
@@ -27,7 +29,7 @@ videoResultAfter = imabsdiff(videoMedians, videoGS);
 
 %% Before pico-injection
 fprintf(['\nPart I - Before pico-injection\n']);
-fprintf(['------------------------------\n']);
+fprintf(['-------------------------------------------------------\n']);
 % Adjust contrast
 % c = 70;
 % f = figure('Name', ...
@@ -161,22 +163,24 @@ lastX = Inf;
 lastNb = 1;
 
 for i = 1:sizeV(4)
-  box = regionprops(videoCroppedBefore(:, :, i), 'BoundingBox');
-  [m, n] = size(box);
-  
-  if(m == 1)
-      boxArray = box.BoundingBox;
-      
-      if(boxArray(1) <= lastX)
-        LBefore = [LBefore, boxArray(3)];
-        lastNb = 1;
-      else
-        LBefore(end) = (LBefore(end)*lastNb + boxArray(3))/(lastNb + 1);
-        lastNb = lastNb + 1;
-      end
-      
-      lastX = boxArray(1);
-  end
+    cc = bwconncomp(videoCroppedBefore(:, :, i), 8);
+    box = regionprops(cc, 'BoundingBox');
+    [m, n] = size(box);
+    
+    if(m == 1)
+        boxArray = box.BoundingBox;
+        
+        if(boxArray(1) <= lastX)
+            LBefore = [LBefore, boxArray(3)];
+            lastNb = 1;
+        else
+            LBefore(end) = ...
+                (LBefore(end)*lastNb + boxArray(3))/(lastNb + 1);
+            lastNb = lastNb + 1;
+        end
+        
+        lastX = boxArray(1);
+    end
 end
 
 % Remove unprobable results (quite arbitrary...)
@@ -187,7 +191,7 @@ disp([num2str(length(LBefore)), ...
 
 %% After pico-injection
 fprintf(['\nPart II - After pico-injection\n']);
-fprintf(['------------------------------\n']);
+fprintf(['-------------------------------------------------------\n']);
 % Adjust contrast
 % c = 70;
 % f = figure('Name', ...
@@ -320,22 +324,23 @@ lastX = Inf;
 lastNb = 1;
 
 for i = 1:sizeV(4)
-  box = regionprops(videoCroppedAfter(:, :, i), 'BoundingBox');
-  [m, n] = size(box);
-  
-  if(m == 1)
-      boxArray = box.BoundingBox;
-      
-      if(boxArray(1) <= lastX)
-        LAfter = [LAfter, boxArray(3)];
-        lastNb = 1;
-      else
-        LAfter(end) = (LAfter(end)*lastNb + boxArray(3))/(lastNb + 1);
-        lastNb = lastNb + 1;
-      end
-      
-      lastX = boxArray(1);
-  end
+    cc = bwconncomp(videoCroppedAfter(:, :, i), 8);
+    box = regionprops(cc, 'BoundingBox');
+    [m, n] = size(box);
+    
+    if(m == 1)
+        boxArray = box.BoundingBox;
+        
+        if(boxArray(1) <= lastX)
+            LAfter = [LAfter, boxArray(3)];
+            lastNb = 1;
+        else
+            LAfter(end) = (LAfter(end)*lastNb + boxArray(3))/(lastNb + 1);
+            lastNb = lastNb + 1;
+        end
+        
+        lastX = boxArray(1);
+    end
 end
 
 % Remove unprobable results (quite arbitrary...)
@@ -345,9 +350,9 @@ disp([num2str(length(LAfter)), ...
 
 %% Compare before and after pico-injection
 fprintf('\nPart III - Comparison\n');
-fprintf('------------------------------\n');
-fprintf(2, ['<strong>/!\ We assume that the pico-injeciton process is', ...
-    ' perfectly working.</strong>\n']);
+fprintf(['-------------------------------------------------------\n']);
+fprintf(2, ['<strong>We assume that the pico-injection process ', ...
+    'is perfectly working.</strong>\n']);
 f = figure('Name', ...
     ['Image processing: Number of drops between rectangles ?', ...
     ' <Press enter>']);
@@ -389,9 +394,88 @@ LComp = LAfter(numOfDrops+1:numOfDrops+nDropletsComp) ...
 %     fprintf(2, ['<strong>WARNING: ', str, '</strong>\n']);
 % end
 
+%% After pico-injection
+fprintf(['\nPart IV - Velocity (before pico-injection)\n']);
+fprintf(['-------------------------------------------------------\n']);
+
+% Choose window
+f = figure('Name', ['Image processing: scaling before pico-injection', ...
+    ' for velocity']);
+imshow(videoGS(:, :, 1));
+while(true)
+    [xC, yC] = ginputc(2, 'Color', 'b', 'LineWidth', 1);
+    xC = double(int64(xC));
+    yC = double(int64(yC));
+    h = rectangle('Position', [xC(1), yC(1), ...
+        abs(xC(2)-xC(1)), abs(yC(2)-yC(1))], 'EdgeColor', 'Red');
+    pause;
+    currkey = get(gcf,'CurrentKey');
+    if strcmp(currkey, 'return')
+        break;
+    else
+        delete(h);
+    end
+end
+close(f);
+
+videoCroppedC = zeros(int64(abs(yC(2)-yC(1))) + 1, ...
+    int64(abs(xC(2)-xC(1))) + 1, sizeV(4));
+for i = 1:sizeV(4)
+    videoCroppedC(:, :, i) = imcrop(videoResultBefore(:, :, i), ...
+        [xC(1), yC(1), abs(xC(2)-xC(1)), abs(yC(2)-yC(1))]);
+end
+
+% Remove elements on border
+for i = 1:sizeV(4)
+   videoCroppedC(:, :, i) = imclearborder(videoCroppedC(:, :, i)); 
+end
+
+% Fit bounding rectangles
+xCoordRecLast = [];
+velocity = [];
+
+for i = 1:sizeV(4)
+    cc = bwconncomp(videoCroppedC(:, :, i), 8);
+    box = regionprops(cc, 'BoundingBox');
+    [m, n] = size(box);
+    
+    xCoordRec = zeros(m, 1);
+    for j = 1:m
+        tab = box(j).BoundingBox;
+        xCoordRec(j) = tab(1);
+    end
+    
+    counter = 1;
+    counterLast = 1;
+    while(true)
+        if(or(counter > size(xCoordRec), ...
+                counterLast > size(xCoordRecLast)))
+            break;
+        end
+        
+        if(xCoordRec(counter) >= xCoordRecLast(counterLast))
+            velocity = [velocity, ...
+                xCoordRec(counter) - xCoordRecLast(counterLast)];
+            counter = counter + 1;
+            counterLast = counterLast + 1;
+        else
+            counter = counter + 1;
+        end
+    end
+    
+    xCoordRecLast = xCoordRec;
+end
+
+% Remove unprobable results (quite arbitrary...)
+velocity = velocity(velocity > mean(velocity)*0.3);
+velocity = velocity(velocity < mean(velocity)*1/(0.3));
+
+disp([num2str(length(velocity)), ' droplets were used for ', ...
+    'the velocity measurement.']);
+
 %% Display the results
-fprintf('\nPart IV - Results\n');
-fprintf('------------------------------\n');
+fprintf('\nPart V - Results\n');
+fprintf(['-------------------------------------------------------\n']);
 % Before pico-injection
 figure('Name', 'Length of the droplets before pico-injection');
 subplot(1, 2, 1);
@@ -463,6 +547,28 @@ disp('Comparison before/after pico-injection:');
 disp(['   - mean(LComp) = ', num2str(mean(LComp)), ' pix']);
 disp(['   - std(LComp) = ', num2str(std(LComp)), ' pix']);
 
+% Velocity
+figure('Name', 'Velocity the droplets (before pico-injection)');
+subplot(1, 2, 1);
+histogram(velocity, 'Normalization', 'pdf');
+% hist(Lafter, sqrt(length(velocity)), 'Normalization', 'pdf');
+grid on;
+set(gca, 'Units', 'normalized', 'FontUnits', 'points', 'FontWeight', ...
+    'normal', 'FontSize', 15, 'FontName','Times');
+xlabel('$v$ [pix/frame]', 'interpreter', 'latex');
+ylabel('PDF [-]', 'interpreter', 'latex');
+xlim([0, max(velocity)]);
+
+subplot(1, 2, 2);
+boxplot(velocity);
+grid on;
+set(gca, 'Units', 'normalized', 'FontUnits', 'points', 'FontWeight', ...
+    'normal', 'FontSize', 15, 'FontName','Times');
+ylabel('$v$ [pix/frame]', 'interpreter', 'latex');
+disp('Velocity (before pico-injection):');
+disp(['   - mean(velocity) = ', num2str(mean(velocity)), ' pix/frame']);
+disp(['   - std(velocity) = ', num2str(std(velocity)), ' pix/frame']);
+
 % Change of length
 % if(enoughDrop)
 %     figure('Name', 'Change of Length due to pico-injection');
@@ -484,3 +590,6 @@ disp(['   - std(LComp) = ', num2str(std(LComp)), ' pix']);
 %     ylabel('$\Delta L$ [pix]', 'interpreter', 'latex');
 %     % ylim([0, 2*max(diffL)]);
 % end
+
+%% Delete the read video
+delete(v);
