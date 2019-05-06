@@ -4,7 +4,7 @@ close all;
 warning('off');
 
 % Import video
-fileName = 'chip4_500fps_rec10.avi';
+fileName = 'chips6_600fps_2_5.aviR.avi';
 v = VideoReader(fileName);
 video = read(v);
 sizeV = size(video);
@@ -95,6 +95,36 @@ for i = 1:sizeV(4)
     videoResultBefore(:, :, i) = ...
         imbinarize(videoResultBefore(:, :, i), t/255);
 end
+
+% Erode the image
+% f = figure('Name', 'Image processing: Before pico-injection erode');
+% img = videoResultBefore(:, :, int64(sizeV(4)/2));
+% while(true)
+%     SE = strel('disk', t); 
+%     imgTemp = imerode(img, SE);
+%     imshow(imgTemp);
+%     textThres = text(50, 50, ['$t = $ ', num2str(t)], 'Color', 'Red', ...
+%         'FontSize', 20);
+%     set(textThres, 'interpreter', 'latex');
+%     
+%     pause;
+%     currkey = get(gcf,'CurrentKey');
+%     if strcmp(currkey, 'return')
+%         break;
+%     elseif strcmp(currkey, 'rightarrow')
+%         t = t + 1;
+%     elseif strcmp(currkey, 'leftarrow')
+%         t = t - 1;
+%         if(t < 1)
+%             t = 1;
+%         end
+%     end
+% end
+% close(f);
+% 
+% for i = 1:sizeV(4)
+%     videoResultBefore(:, :, i) = imerode(videoResultBefore(:, :, i), SE);
+% end
 
 % Remove small particules
 part = 30;
@@ -442,31 +472,34 @@ for i = 1:sizeV(4)
     box = regionprops(cc, 'BoundingBox');
     [m, n] = size(box);
     
-    xCoordRec = zeros(m, 1);
-    for j = 1:m
-        tab = box(j).BoundingBox;
-        xCoordRec(j) = tab(1);
-    end
-    
-    counter = 1;
-    counterLast = 1;
-    while(true)
-        if(or(counter > size(xCoordRec), ...
-                counterLast > size(xCoordRecLast)))
-            break;
+    if(m >= 1)
+        xCoordRec = zeros(m, 1);
+        
+        for j = 1:m
+            tab = box(j).BoundingBox;
+            xCoordRec(j) = tab(1);
         end
         
-        if(xCoordRec(counter) >= xCoordRecLast(counterLast))
-            velocity = [velocity, ...
-                xCoordRec(counter) - xCoordRecLast(counterLast)];
-            counter = counter + 1;
-            counterLast = counterLast + 1;
-        else
-            counter = counter + 1;
+        counter = 1;
+        counterLast = 1;
+        while(true)
+            if(or(counter > size(xCoordRec), ...
+                    counterLast > size(xCoordRecLast)))
+                break;
+            end
+            
+            if(xCoordRec(counter) >= xCoordRecLast(counterLast))
+                velocity = [velocity, ...
+                    xCoordRec(counter) - xCoordRecLast(counterLast)];
+                counter = counter + 1;
+                counterLast = counterLast + 1;
+            else
+                counter = counter + 1;
+            end
         end
+        
+        xCoordRecLast = xCoordRec;
     end
-    
-    xCoordRecLast = xCoordRec;
 end
 
 % Remove unprobable results (quite arbitrary...)
