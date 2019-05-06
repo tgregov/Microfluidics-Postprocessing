@@ -13,7 +13,9 @@ if(length(sizeV) ~= 4)
         ' FRAME FOR THIS SCRIPT TO WORK</strong>\n']);
     return;
 end
-videoGS = reshape(video, sizeV(1), sizeV(2), sizeV(4));
+colorChoice = 1;
+videoGS = reshape(video(:, :, colorChoice, :), sizeV(1), sizeV(2), sizeV(4));
+clear video;
 videoGS = im2double(videoGS);
 fprintf(['<strong>Post-processing of the file ', fileName, '</strong>\n']);
 disp(['The video has ', num2str(v.NumberOfFrames), ' frames.']);
@@ -26,6 +28,7 @@ for i = 1:sizeV(4)
 end
 videoResultBefore = imabsdiff(videoMedians, videoGS);
 videoResultAfter = imabsdiff(videoMedians, videoGS);
+clear videoMedians;
 
 %% Before pico-injection
 fprintf(['\nPart I - Before pico-injection\n']);
